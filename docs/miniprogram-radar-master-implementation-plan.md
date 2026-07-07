@@ -718,14 +718,21 @@ MVP 完成标准：
 
 ## 17. 当前下一步
 
-当前代码侧已经具备较完整的 MVP 骨架，下一步重点是外部服务和生产验证：
+当前代码侧已经具备较完整的 MVP 骨架，Vercel 项目和 feature 分支 Preview 已创建并验证通过。下一步重点是人工确认 Preview、合并到 `main`、完成 Production 部署和外部服务配置。
 
-1. 在 Vercel 创建并部署项目。
-2. 获取 Production URL。
-3. 执行 `npm run vercel:preflight -- <production-url>`。
-4. 创建 Neon 或 Supabase，配置 `DATABASE_URL`。
-5. 执行 `npm run db:migrate` 和 `npm run db:import`。
-6. 配置 `CRON_SECRET`、`ADMIN_TOKEN`、`GITHUB_TOKEN`。
-7. 执行 `VERIFY_CRON_SECRET=<CRON_SECRET> VERIFY_ADMIN_TOKEN=<ADMIN_TOKEN> npm run deployment:verify -- <production-url>`。
-8. 配置 Upstash Redis 和 Vercel Blob。
-9. 用户确认后再接真实 AI。
+1. 人工确认 PR #360 的 Preview：
+
+```text
+https://wechat-miniapp-radar-git-feature-wechat-miniapp-radar-justjavac.vercel.app
+```
+
+2. Preview 确认无误后，将 PR #360 标记 ready 并合并到 `main`。
+3. 等待 Vercel Production 部署成功并获取 Production URL。
+4. 配置生产 `SITE_URL` 和 `NEXT_PUBLIC_SITE_URL`。
+5. 执行 `npm run vercel:preflight -- <production-url>` 和 `npm run deployment:verify -- <production-url>`。
+6. 创建 Neon 或 Supabase，配置 `DATABASE_URL`。
+7. 执行 `npm run db:migrate`、`npm run db:import` 和 `EXPECT_DATABASE=1 npm run db:verify`。
+8. 配置 `CRON_SECRET`、`ADMIN_TOKEN`、`GITHUB_TOKEN`。
+9. 执行 `VERIFY_CRON_SECRET=<CRON_SECRET> VERIFY_ADMIN_TOKEN=<ADMIN_TOKEN> npm run deployment:verify -- <production-url>`。
+10. 配置 Upstash Redis 和 Vercel Blob，并执行严格集成验证。
+11. 用户确认后再配置 `OPENAI_API_KEY` 并启用真实 AI。
