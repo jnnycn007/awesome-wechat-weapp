@@ -25,6 +25,8 @@ const pageMarkers: Record<string, string> = {
   "/admin": "Admin 需要授权"
 };
 
+let canonicalOriginOverride: string | null = null;
+
 function sendJson(response: ServerResponse, status: number, payload: unknown) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
@@ -46,6 +48,7 @@ async function readBody(request: IncomingMessage) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const origin = `http://${request.headers.host}`;
+  const canonicalOrigin = canonicalOriginOverride ?? origin;
 
   if (request.method === "GET" && pageMarkers[url.pathname]) {
     sendText(response, 200, `<html><body>${pageMarkers[url.pathname]}</body></html>`);
@@ -172,14 +175,14 @@ const server = createServer(async (request, response) => {
     sendText(
       response,
       200,
-      `<?xml version="1.0"?><urlset><url><loc>${origin}/radar</loc></url><url><loc>${origin}/resources/github-com-nervjstaro</loc></url></urlset>`,
+      `<?xml version="1.0"?><urlset><url><loc>${canonicalOrigin}/radar</loc></url><url><loc>${canonicalOrigin}/resources/github-com-nervjstaro</loc></url></urlset>`,
       "application/xml; charset=utf-8"
     );
     return;
   }
 
   if (request.method === "GET" && url.pathname === "/robots.txt") {
-    sendText(response, 200, `User-Agent: *\nAllow: /\nDisallow: /api/cron\nSitemap: ${origin}/sitemap.xml\n`, "text/plain; charset=utf-8");
+    sendText(response, 200, `User-Agent: *\nAllow: /\nDisallow: /api/cron\nSitemap: ${canonicalOrigin}/sitemap.xml\n`, "text/plain; charset=utf-8");
     return;
   }
 
@@ -349,6 +352,22 @@ try {
   assert.equal(baselineOutput.results?.find((result) => result.name === "seo:/sitemap.xml")?.status, "pass");
   assert.equal(baselineOutput.results?.find((result) => result.name === "seo:/robots.txt")?.status, "pass");
 
+  canonicalOriginOverride = "https://canonical.example.com";
+  const detectedCanonical = await runVerifier(baseUrl);
+  canonicalOriginOverride = null;
+  assert.equal(detectedCanonical.status, 0, detectedCanonical.stderr);
+  const detectedCanonicalOutput = parseVerifierOutput(detectedCanonical.stdout);
+  assert.equal(detectedCanonicalOutput.summary?.fail, 0);
+  assert.equal(detectedCanonicalOutput.results?.find((result) => result.name === "seo:/sitemap.xml")?.status, "pass");
+  assert.equal(detectedCanonicalOutput.results?.find((result) => result.name === "seo:/robots.txt")?.status, "pass");
+
+  const strictCanonical = await runVerifier(baseUrl, { EXPECTED_CANONICAL_URL: "https://canonical.example.com" });
+  assert.equal(strictCanonical.status, 1, "strict canonical expectation should fail when sitemap and robots use the service origin");
+  const strictCanonicalOutput = parseVerifierOutput(strictCanonical.stdout);
+  assert.equal(strictCanonicalOutput.summary?.fail, 2);
+  assert.equal(strictCanonicalOutput.results?.find((result) => result.name === "seo:/sitemap.xml")?.status, "fail");
+  assert.equal(strictCanonicalOutput.results?.find((result) => result.name === "seo:/robots.txt")?.status, "fail");
+
   const strictDatabase = await runVerifier(baseUrl, { EXPECT_DATABASE: "1" });
   assert.equal(strictDatabase.status, 1, "strict database expectation should fail when health reports no database");
   const strictOutput = parseVerifierOutput(strictDatabase.stdout);
@@ -378,9 +397,11 @@ try {
     JSON.stringify(
       {
         checkedAt: new Date().toISOString(),
-        cases: 5,
+        cases: 7,
         assertions: [
           "deployment verifier baseline",
+          "detected canonical URL fallback",
+          "strict canonical URL expectation",
           "ai summaries probe",
           "compare insights probe",
           "resource detail evidence probe",

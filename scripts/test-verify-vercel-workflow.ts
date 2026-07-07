@@ -124,7 +124,9 @@ assert.equal(env.VERIFY_ADMIN_TOKEN, "${{ secrets.ADMIN_TOKEN }}");
 
 const run = requireString(verifyStep.run, "Verify production deployment run");
 assertIncludes(run, "set -euo pipefail", "verification script");
-assertIncludes(run, 'BASE_URL="${INPUT_PRODUCTION_URL:-$DEPLOYMENT_STATUS_URL}"', "verification script");
+assertIncludes(run, 'DEFAULT_PRODUCTION_URL="https://wechat-miniapp-radar.vercel.app"', "verification script");
+assertIncludes(run, 'BASE_URL="${INPUT_PRODUCTION_URL:-${SITE_URL:-${NEXT_PUBLIC_SITE_URL:-$DEFAULT_PRODUCTION_URL}}}"', "verification script");
+assertIncludes(run, 'BASE_URL="$DEPLOYMENT_STATUS_URL"', "verification script");
 assertIncludes(run, "No production URL was provided", "verification script");
 
 for (const expectation of [
@@ -144,7 +146,7 @@ const expectedCommands = [
   'npm run vercel:preflight -- "$BASE_URL"',
   'npm run mvp:check -- "$BASE_URL"',
   "npm run integrations:verify",
-  'npm run deployment:verify -- "$BASE_URL"'
+  'EXPECTED_CANONICAL_URL="$BASE_URL" npm run deployment:verify -- "$BASE_URL"'
 ];
 let previousIndex = -1;
 for (const command of expectedCommands) {
@@ -163,6 +165,7 @@ console.log(
         "production-only deployment condition",
         "Node.js setup and npm ci",
         "verification env mapping",
+        "canonical production URL fallback",
         "expectation flag exports",
         "production verification command order"
       ]

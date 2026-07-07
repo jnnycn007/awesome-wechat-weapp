@@ -106,10 +106,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          BASE_URL="${INPUT_PRODUCTION_URL:-$DEPLOYMENT_STATUS_URL}"
+          DEFAULT_PRODUCTION_URL="https://wechat-miniapp-radar.vercel.app"
+          BASE_URL="${INPUT_PRODUCTION_URL:-${SITE_URL:-${NEXT_PUBLIC_SITE_URL:-$DEFAULT_PRODUCTION_URL}}}"
+          if [ -z "$BASE_URL" ] && [ -n "$DEPLOYMENT_STATUS_URL" ]; then
+            BASE_URL="$DEPLOYMENT_STATUS_URL"
+          fi
           if [ -z "$BASE_URL" ]; then
             echo "No production URL was provided by workflow input or deployment_status.target_url."
             exit 1
+          fi
+          echo "Verifying production URL: $BASE_URL"
+          if [ -n "$DEPLOYMENT_STATUS_URL" ] && [ "$BASE_URL" != "$DEPLOYMENT_STATUS_URL" ]; then
+            echo "Deployment status URL: $DEPLOYMENT_STATUS_URL"
           fi
 
           if [ "$INPUT_EXPECT_VERCEL_DEPLOY" = "true" ] || [ "$VAR_EXPECT_VERCEL_DEPLOY" = "1" ]; then export EXPECT_VERCEL_DEPLOY=1; fi
@@ -124,4 +132,4 @@ jobs:
           npm run vercel:preflight -- "$BASE_URL"
           npm run mvp:check -- "$BASE_URL"
           npm run integrations:verify
-          npm run deployment:verify -- "$BASE_URL"
+          EXPECTED_CANONICAL_URL="$BASE_URL" npm run deployment:verify -- "$BASE_URL"

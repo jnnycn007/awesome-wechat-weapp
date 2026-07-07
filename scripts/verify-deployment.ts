@@ -143,6 +143,43 @@ function normalizeBaseUrl(value: string) {
   return url.toString().replace(/\/$/, "");
 }
 
+function normalizeCanonicalBaseUrl(value: string) {
+  const normalized = normalizeBaseUrl(value);
+  const url = new URL(normalized);
+  return url.origin;
+}
+
+function getExplicitCanonicalBaseUrl() {
+  const rawValue = process.env.EXPECTED_CANONICAL_URL ?? process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
+  if (!rawValue) return null;
+  return normalizeCanonicalBaseUrl(rawValue);
+}
+
+function parseCanonicalBaseFromRobots(text: string) {
+  const sitemapMatch = text.match(/^Sitemap:\s*(https?:\/\/\S+)\s*$/im);
+  if (sitemapMatch?.[1]) {
+    return normalizeCanonicalBaseUrl(sitemapMatch[1].replace(/\/sitemap\.xml(?:\?.*)?$/, ""));
+  }
+
+  const hostMatch = text.match(/^Host:\s*(\S+)\s*$/im);
+  if (hostMatch?.[1]) {
+    const host = hostMatch[1].startsWith("http://") || hostMatch[1].startsWith("https://") ? hostMatch[1] : `https://${hostMatch[1]}`;
+    return normalizeCanonicalBaseUrl(host);
+  }
+
+  return null;
+}
+
+function parseCanonicalBaseFromSitemap(text: string) {
+  const locMatch = text.match(/<loc>(https?:\/\/[^<]+)<\/loc>/i);
+  if (!locMatch?.[1]) return null;
+  return normalizeCanonicalBaseUrl(locMatch[1]);
+}
+
+function resolveCanonicalBaseUrl(robotsText?: string, sitemapText?: string) {
+  return getExplicitCanonicalBaseUrl() ?? (robotsText ? parseCanonicalBaseFromRobots(robotsText) : null) ?? (sitemapText ? parseCanonicalBaseFromSitemap(sitemapText) : null) ?? baseUrl;
+}
+
 function record(name: string, status: CheckStatus, detail: string) {
   results.push({ name, status, detail });
 }
@@ -349,32 +386,45 @@ async function checkRss() {
 }
 
 async function checkSeoFiles() {
+  let sitemapResponse: Response | null = null;
+  let sitemapText: string | null = null;
+  let robotsResponse: Response | null = null;
+  let robotsText: string | null = null;
+
   try {
-    const response = await fetchWithTimeout("/sitemap.xml");
-    const text = await response.text();
-    const entryCount = text.match(/<url>/g)?.length ?? 0;
-    const hasCanonicalRadar = text.includes(`${baseUrl}/radar`);
-    const hasCanonicalResource = text.includes(`${baseUrl}/resources/`);
-    record(
-      "seo:/sitemap.xml",
-      response.ok && hasCanonicalRadar && hasCanonicalResource ? "pass" : "fail",
-      `${response.status}, entries=${entryCount}, canonicalRadar=${hasCanonicalRadar ? "yes" : "no"}, canonicalResource=${hasCanonicalResource ? "yes" : "no"}`
-    );
+    sitemapResponse = await fetchWithTimeout("/sitemap.xml");
+    sitemapText = await sitemapResponse.text();
   } catch (error) {
     record("seo:/sitemap.xml", "fail", error instanceof Error ? error.message : String(error));
   }
 
   try {
-    const response = await fetchWithTimeout("/robots.txt");
-    const text = await response.text();
-    const hasCanonicalSitemap = text.includes(`Sitemap: ${baseUrl}/sitemap.xml`);
-    record(
-      "seo:/robots.txt",
-      response.ok && hasCanonicalSitemap && text.includes("Disallow: /api/cron") ? "pass" : "fail",
-      `${response.status}, canonicalSitemap=${hasCanonicalSitemap ? "yes" : "no"}`
-    );
+    robotsResponse = await fetchWithTimeout("/robots.txt");
+    robotsText = await robotsResponse.text();
   } catch (error) {
     record("seo:/robots.txt", "fail", error instanceof Error ? error.message : String(error));
+  }
+
+  const canonicalBaseUrl = resolveCanonicalBaseUrl(robotsText ?? undefined, sitemapText ?? undefined);
+
+  if (sitemapResponse && sitemapText !== null) {
+    const entryCount = sitemapText.match(/<url>/g)?.length ?? 0;
+    const hasCanonicalRadar = sitemapText.includes(`${canonicalBaseUrl}/radar`);
+    const hasCanonicalResource = sitemapText.includes(`${canonicalBaseUrl}/resources/`);
+    record(
+      "seo:/sitemap.xml",
+      sitemapResponse.ok && hasCanonicalRadar && hasCanonicalResource ? "pass" : "fail",
+      `${sitemapResponse.status}, entries=${entryCount}, canonical=${canonicalBaseUrl}, canonicalRadar=${hasCanonicalRadar ? "yes" : "no"}, canonicalResource=${hasCanonicalResource ? "yes" : "no"}`
+    );
+  }
+
+  if (robotsResponse && robotsText !== null) {
+    const hasCanonicalSitemap = robotsText.includes(`Sitemap: ${canonicalBaseUrl}/sitemap.xml`);
+    record(
+      "seo:/robots.txt",
+      robotsResponse.ok && hasCanonicalSitemap && robotsText.includes("Disallow: /api/cron") ? "pass" : "fail",
+      `${robotsResponse.status}, canonical=${canonicalBaseUrl}, canonicalSitemap=${hasCanonicalSitemap ? "yes" : "no"}`
+    );
   }
 }
 
