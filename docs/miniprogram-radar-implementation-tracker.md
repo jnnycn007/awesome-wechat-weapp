@@ -19,10 +19,10 @@
 | P2 Vercel Preview 部署 | 已完成 | PR #360 已合并；Preview URL `https://wechat-miniapp-radar-git-feature-wechat-miniapp-radar-justjavac.vercel.app` 曾通过 `npm run deployment:verify -- <preview-url>`、`npm run mvp:check -- <preview-url>`；GitHub `links`、`validate`、Vercel 检查通过 | 后续功能继续走非 `main` 分支和 Preview 验证 |
 | P2.1 Vercel Production 部署 | 已完成 | PR #360 和 PR #361 已合并到 `main`；Production 部署 Ready；生产别名 `https://wechat-miniapp-radar.vercel.app` 通过 `npm run deployment:verify -- <production-url>` 和 `npm run mvp:check -- <production-url>`；`Verify Vercel Production` 已恢复成功 | 继续 P3 外部依赖 |
 | P3 Postgres 主库 | 未开始 | `DATABASE_URL` 未配置 | 选择 Neon 或 Supabase，执行迁移和导入 |
-| P4 采集与评分 Cron | 待生产配置 | Cron 代码和鉴权测试已具备 | 配置 `CRON_SECRET` 和 `GITHUB_TOKEN`，做 dry-run |
+| P4 采集与评分 Cron | 进行中 | Cron 代码和鉴权测试已具备；Production 已配置 `CRON_SECRET`，`/api/cron/enrich` 和 `/api/cron/weekly` dry-run 通过 | 配置 `GITHUB_TOKEN`，再做采集额度和真实调度观察 |
 | P5 Redis 缓存/限流/任务锁 | 待生产配置 | 本地测试覆盖降级、锁冲突和失败兜底 | 创建 Upstash Redis 并验证 |
-| P6 Blob 报告和快照 | 待生产配置 | 代码支持上传和 fallback | 创建 Vercel Blob，执行写入/删除探针 |
-| P7 Admin 运维闭环 | 待生产配置 | Admin API 和 readiness 已实现，Admin 端点目录已包含 `/api/admin/readiness`，需 `ADMIN_TOKEN` | 配置 `ADMIN_TOKEN` 并验证授权读取 |
+| P6 Blob 报告和快照 | 已完成 | Production 已创建 Vercel Blob Store `wechat-miniapp-radar-artifacts` 并配置 `BLOB_READ_WRITE_TOKEN`；Doctor 报告生产上传返回 Blob URL | 后续按免费额度观察 Blob 文件数和存储量 |
+| P7 Admin 运维闭环 | 已完成 | Production 已配置 `ADMIN_TOKEN`；`/api/admin/readiness` 授权读取通过；Admin API 和 readiness 已实现 | Postgres 接入后再验证资源维护写入链路 |
 | P8 真实 AI | 暂缓 | 规则型 AI 可用，输出校验已覆盖 | 用户确认后再配置 `OPENAI_API_KEY` |
 | P9 上线观察 | 未开始 | 尚无生产流量 | 生产部署后观察 7 天 |
 
@@ -40,11 +40,11 @@
 | --- | --- | --- | --- | --- |
 | I-001 | Vercel Production 尚未成功部署 | 无法完成生产验收 | 已关闭 | PR #360 已合并；Production 部署 Ready；`https://wechat-miniapp-radar.vercel.app` 通过部署和 MVP 校验 |
 | I-002 | `DATABASE_URL` 未配置 | 线上只能使用静态 JSON 降级 | 打开 | 默认优先 Neon Postgres；需要 Auth 时选 Supabase |
-| I-003 | `CRON_SECRET` 未配置 | 生产 Cron 不能授权运行 | 打开 | 在 Vercel 环境变量配置后执行 dry-run |
-| I-004 | `ADMIN_TOKEN` 未配置 | Admin readiness 只能验证未授权保护 | 打开 | 配置后执行授权 readiness 验证 |
+| I-003 | `CRON_SECRET` 未配置 | 生产 Cron 不能授权运行 | 已关闭 | 已在 Vercel Production 配置并 redeploy；Cron enrich/weekly dry-run 通过 |
+| I-004 | `ADMIN_TOKEN` 未配置 | Admin readiness 只能验证未授权保护 | 已关闭 | 已在 Vercel Production 配置并 redeploy；Admin readiness 授权读取通过 |
 | I-005 | `GITHUB_TOKEN` 未配置 | GitHub 采集额度低 | 打开 | 配置只读 token 或降低采集频率 |
 | I-006 | Redis 未配置 | 生产环境缺分布式限流和任务锁 | 打开 | 接入 Upstash Redis |
-| I-007 | Blob 未配置 | 周报、Doctor 报告和导出快照不能归档 | 打开 | 接入 Vercel Blob |
+| I-007 | Blob 未配置 | 周报、Doctor 报告和导出快照不能归档 | 已关闭 | 已创建 Vercel Blob Store 并连接项目；`/api/doctor` 生产上传报告返回 Blob URL |
 | I-008 | 真实 AI 未启用 | Advisor、摘要、周报、Doctor 只能使用规则兜底 | 暂缓 | 用户确认后再配置 `OPENAI_API_KEY` |
 
 ## 4. 风险清单
@@ -86,6 +86,11 @@
 | 2026-07-07 | PR #361 Preview 部署校验 | `npm run deployment:verify -- https://wechat-miniapp-radar-git-chore-fix-production-da3294-justjavac.vercel.app` | 通过 | 26 pass / 8 warn / 0 fail；Preview canonical 指向生产别名，脚本已按 sitemap/robots 一致性处理 |
 | 2026-07-07 | PR #361 合并后 Production 部署 | Vercel deployment `https://wechat-miniapp-radar-a1t8ha06d-justjavac.vercel.app`、生产别名 `https://wechat-miniapp-radar.vercel.app` | 通过 | merge commit `8c3851e` 已部署到 Production；`Validate resources` run 28858056384 成功；`Verify Vercel Production` run 28858104678 成功 |
 | 2026-07-07 | PR #361 合并后 Production 复验 | `EXPECTED_CANONICAL_URL=https://wechat-miniapp-radar.vercel.app npm run deployment:verify -- https://wechat-miniapp-radar.vercel.app`、`/api/health` | 通过 | 27 pass / 7 warn / 0 fail；`/api/health` 显示 `integrations.siteUrl:true` |
+| 2026-07-07 | PR #362 合并后 Production 部署 | Vercel deployment `https://wechat-miniapp-radar-q9ftsi5xa-justjavac.vercel.app`、生产别名 `https://wechat-miniapp-radar.vercel.app` | 通过 | merge commit `2223fdb` 已部署到 Production；`Validate resources` run 28858714019 成功；`Verify Vercel Production` run 28858757802 成功 |
+| 2026-07-07 | Cron/Admin 生产密钥配置 | `npx vercel env add CRON_SECRET production`、`npx vercel env add ADMIN_TOKEN production`、Production redeploy | 通过 | 重新构建部署 `https://wechat-miniapp-radar-kxzjbvihv-justjavac.vercel.app` 后，`/api/health` 显示 `cronSecret:true`、`adminToken:true` |
+| 2026-07-07 | Cron/Admin 授权生产复验 | `VERIFY_CRON_SECRET=<secret> VERIFY_ADMIN_TOKEN=<secret> EXPECTED_CANONICAL_URL=https://wechat-miniapp-radar.vercel.app npm run deployment:verify -- https://wechat-miniapp-radar.vercel.app` | 通过 | 32 pass / 5 warn / 0 fail；Cron enrich/weekly dry-run 和 Admin readiness 授权读取均通过 |
+| 2026-07-07 | Vercel Blob Store 配置 | `npx vercel blob create-store wechat-miniapp-radar-artifacts --access public --environment production --yes`、Production deploy | 通过 | Blob Store `store_3a5qRZebeUOkJe88` 已创建并连接项目；`/api/health` 显示 `blob:true` |
+| 2026-07-07 | Vercel Blob 生产写入验证 | `POST /api/doctor` with `uploadReport:true` | 通过 | Doctor 报告上传成功，返回 `*.public.blob.vercel-storage.com` Blob URL；生产部署校验为 30 pass / 4 warn / 0 fail |
 
 ## 6. 下一步执行清单
 
