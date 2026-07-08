@@ -51,6 +51,14 @@ function responseFormatForModel(config: AiConfig, model: string) {
   return {};
 }
 
+function tokenLimitForModel(config: AiConfig, model: string) {
+  if (config.provider !== "openrouter" && /^gpt-5(?:\.|-|$)/i.test(model)) {
+    return { max_completion_tokens: DEFAULT_AI_MAX_TOKENS };
+  }
+
+  return { max_tokens: DEFAULT_AI_MAX_TOKENS };
+}
+
 async function fetchTextWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -159,8 +167,8 @@ async function requestChatCompletion<T>({
         model,
         messages,
         temperature: 0.2,
-        max_tokens: DEFAULT_AI_MAX_TOKENS,
         stream: false,
+        ...tokenLimitForModel(config, model),
         ...responseFormatForModel(config, model)
       })
     },

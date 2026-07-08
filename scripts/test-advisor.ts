@@ -265,8 +265,10 @@ try {
     agentRouterRequestCount += 1;
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     assert.equal(url, "https://agentrouter.org/v1/chat/completions");
-    const body = JSON.parse(String(init?.body)) as { model?: string; response_format?: unknown };
+    const body = JSON.parse(String(init?.body)) as { model?: string; max_completion_tokens?: number; max_tokens?: number; response_format?: unknown };
     assert.equal(body.model, "gpt-5.5");
+    assert.equal(body.max_completion_tokens, 1400);
+    assert.equal(body.max_tokens, undefined);
     assert.equal(body.response_format, undefined);
 
     return new Response(
