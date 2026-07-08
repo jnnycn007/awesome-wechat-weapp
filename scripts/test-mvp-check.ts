@@ -116,8 +116,8 @@ assert.equal(strictOutput.checks?.find((check) => check.name === "env:OPENAI_API
 const openRouterConfigured = await runMvpCheck({
   OPENAI_API_KEY: "test-openrouter-key",
   OPENAI_API_URL: "https://openrouter.ai/api/v1",
-  OPENAI_MODEL: "nvidia/nemotron-3-ultra-550b-a55b:free",
-  OPENAI_FALLBACK_MODEL: "qwen/qwen3-next-80b-a3b-instruct:free"
+  OPENAI_MODEL: "openai/gpt-oss-20b:free",
+  OPENAI_FALLBACK_MODEL: "nvidia/nemotron-nano-9b-v2:free"
 });
 assert.equal(openRouterConfigured.status, 0, openRouterConfigured.stderr);
 const openRouterConfiguredOutput = parseOutput(openRouterConfigured.stdout);
