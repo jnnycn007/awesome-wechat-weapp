@@ -269,25 +269,16 @@ try {
     assert.equal(url, "https://agentrouter.org/v1/chat/completions");
     const headers = new Headers(init?.headers);
     const body = JSON.parse(String(init?.body)) as { model?: string; max_completion_tokens?: number; max_tokens?: number; response_format?: unknown; stream?: boolean };
-    assert.equal(headers.get("accept"), "text/event-stream");
+    assert.equal(headers.get("accept"), null);
+    assert.equal(headers.get("user-agent"), "codex_cli_rs/0.0.0");
+    assert.equal(headers.get("accept-language"), "en-US,en;q=0.9");
     assert.equal(body.model, "gpt-5.5");
     assert.equal(body.max_completion_tokens, undefined);
     assert.equal(body.max_tokens, 1400);
     assert.equal(body.response_format, undefined);
-    assert.equal(body.stream, true);
+    assert.equal(body.stream, false);
 
-    return new Response(
-      [
-        `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(agentRouterAnswer) } }] })}`,
-        "",
-        "data: [DONE]",
-        ""
-      ].join("\n"),
-      {
-        status: 200,
-        headers: { "content-type": "text/event-stream" }
-      }
-    );
+    return Response.json({ choices: [{ message: { content: JSON.stringify(agentRouterAnswer) } }] });
   };
 
   const agentRouterRouteResponse = await advisorRoute(
@@ -300,7 +291,7 @@ try {
       body: JSON.stringify({ question: questions[0].question })
     })
   );
-  assert.equal(agentRouterRouteResponse.status, 200, "advisor route should accept streaming chat content from AgentRouter-compatible endpoints");
+  assert.equal(agentRouterRouteResponse.status, 200, "advisor route should accept chat content from AgentRouter-compatible endpoints");
   assert.equal(agentRouterRouteResponse.headers.get("x-advisor-source"), "ai");
   assert.equal(agentRouterRouteResponse.headers.get("x-advisor-model"), "gpt-5.5");
   const agentRouterRouteAnswer = (await agentRouterRouteResponse.json()) as ReturnType<typeof createAdvisorAnswer> & { source?: string; model?: string | null };

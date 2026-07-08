@@ -86,6 +86,7 @@ function tokenLimitForModel(config: AiConfig, model: string) {
 }
 
 function shouldStreamChatCompletion(config: AiConfig) {
+  if (config.apiUrl.toLowerCase() === AGENTROUTER_API_URL) return false;
   return config.provider === "custom";
 }
 
