@@ -20,6 +20,13 @@ interface ChatCompletionResponse {
 
 const DEFAULT_AI_TIMEOUT_MS = 4_000;
 const DEFAULT_AI_MAX_TOKENS = 1400;
+const OPENROUTER_JSON_RESPONSE_FORMAT_MODELS = new Set([
+  "google/gemma-4-26b-a4b-it:free",
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "openai/gpt-oss-20b:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free"
+]);
 
 function completionUrl(config: AiConfig) {
   return `${config.apiUrl}/chat/completions`;
@@ -33,6 +40,14 @@ function openRouterHeaders(config: AiConfig): Record<string, string> {
     ...(siteUrl ? { "HTTP-Referer": siteUrl } : {}),
     "X-Title": "MiniProgram Radar"
   };
+}
+
+function responseFormatForModel(config: AiConfig, model: string) {
+  if (config.provider === "openrouter" && OPENROUTER_JSON_RESPONSE_FORMAT_MODELS.has(model)) {
+    return { response_format: { type: "json_object" } };
+  }
+
+  return {};
 }
 
 async function fetchTextWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
@@ -112,7 +127,8 @@ async function requestChatCompletion<T>({
         messages,
         temperature: 0.2,
         max_tokens: DEFAULT_AI_MAX_TOKENS,
-        stream: false
+        stream: false,
+        ...responseFormatForModel(config, model)
       })
     },
     timeoutMs

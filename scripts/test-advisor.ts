@@ -140,9 +140,10 @@ try {
     assert.equal(init?.method, "POST");
     const headers = new Headers(init?.headers);
     assert.equal(headers.get("authorization"), "Bearer test-openrouter-key");
-    const body = JSON.parse(String(init?.body)) as { model?: string; messages?: unknown[]; stream?: boolean };
+    const body = JSON.parse(String(init?.body)) as { model?: string; messages?: unknown[]; stream?: boolean; response_format?: unknown };
     assert.equal(body.model, "test-primary-model");
     assert.equal(body.stream, false);
+    assert.equal(body.response_format, undefined);
     assert.ok(Array.isArray(body.messages) && body.messages.length === 2, "AI request should include prompt contract messages");
     return new Response(
       JSON.stringify({
@@ -185,6 +186,8 @@ try {
   assert.equal(aiRequestCount, 1, "advisor route should call the AI provider once for a valid primary response");
   globalThis.fetch = originalFetch;
 
+  setEnv("OPENAI_FALLBACK_MODEL", "qwen/qwen3-next-80b-a3b-instruct:free");
+
   const fallbackModelAnswer = {
     ...draftAiAnswer,
     recommendation: `Fallback AI 建议：${draftAiAnswer.recommendation}`
@@ -193,15 +196,19 @@ try {
   globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     assert.equal(url, "https://openrouter.ai/api/v1/chat/completions");
-    const body = JSON.parse(String(init?.body)) as { model?: string };
+    const body = JSON.parse(String(init?.body)) as { model?: string; response_format?: { type?: string } };
     requestedModels.push(body.model ?? "");
 
     if (body.model === "test-primary-model") {
+      assert.equal(body.response_format, undefined);
       return new Response(JSON.stringify({ error: { message: "primary unavailable" } }), {
         status: 503,
         headers: { "content-type": "application/json" }
       });
     }
+
+    assert.equal(body.model, "qwen/qwen3-next-80b-a3b-instruct:free");
+    assert.equal(body.response_format?.type, "json_object");
 
     return new Response(
       JSON.stringify({
@@ -232,17 +239,17 @@ try {
   );
   assert.equal(fallbackRouteResponse.status, 200, "advisor route should return a fallback model answer when primary fails");
   assert.equal(fallbackRouteResponse.headers.get("x-advisor-source"), "ai");
-  assert.equal(fallbackRouteResponse.headers.get("x-advisor-model"), "test-fallback-model");
+  assert.equal(fallbackRouteResponse.headers.get("x-advisor-model"), "qwen/qwen3-next-80b-a3b-instruct:free");
   assert.equal(fallbackRouteResponse.headers.get("x-advisor-fallback"), "true");
   const fallbackRouteAnswer = (await fallbackRouteResponse.json()) as ReturnType<typeof createAdvisorAnswer> & { source?: string; model?: string | null; fallbackUsed?: boolean; fallbackReason?: string | null };
   const fallbackRouteValidation = validateAdvisorAnswer(fallbackRouteAnswer, resources);
   assert.equal(fallbackRouteValidation.ok, true, fallbackRouteValidation.errors.join("\n"));
   assert.equal(fallbackRouteAnswer.source, "ai");
-  assert.equal(fallbackRouteAnswer.model, "test-fallback-model");
+  assert.equal(fallbackRouteAnswer.model, "qwen/qwen3-next-80b-a3b-instruct:free");
   assert.equal(fallbackRouteAnswer.fallbackUsed, true);
   assert.equal(fallbackRouteAnswer.fallbackReason, null);
   assert.match(fallbackRouteAnswer.recommendation, /^Fallback AI 建议：/);
-  assert.deepEqual(requestedModels, ["test-primary-model", "test-fallback-model"], "advisor route should try primary then fallback model");
+  assert.deepEqual(requestedModels, ["test-primary-model", "qwen/qwen3-next-80b-a3b-instruct:free"], "advisor route should try primary then fallback model");
   globalThis.fetch = originalFetch;
 
   console.log(
