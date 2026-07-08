@@ -32,6 +32,7 @@ interface ResponsesApiResponse {
 
 const DEFAULT_AI_TIMEOUT_MS = 8_000;
 const DEFAULT_AI_MAX_TOKENS = 1400;
+const AGENTROUTER_API_URL = "https://agentrouter.org/v1";
 const OPENROUTER_JSON_RESPONSE_FORMAT_MODELS = new Set([
   "google/gemma-4-26b-a4b-it:free",
   "google/gemma-4-31b-it:free",
@@ -56,6 +57,15 @@ function openRouterHeaders(config: AiConfig): Record<string, string> {
   return {
     ...(siteUrl ? { "HTTP-Referer": siteUrl } : {}),
     "X-Title": "MiniProgram Radar"
+  };
+}
+
+function agentRouterHeaders(config: AiConfig): Record<string, string> {
+  if (config.apiUrl.toLowerCase() !== AGENTROUTER_API_URL) return {};
+
+  return {
+    "user-agent": "codex_cli_rs/0.0.0",
+    "accept-language": "en-US,en;q=0.9"
   };
 }
 
@@ -350,6 +360,7 @@ async function requestChatCompletion<T>({
         ...(stream ? { accept: "text/event-stream" } : {}),
         "content-type": "application/json",
         authorization: `Bearer ${apiKey}`,
+        ...agentRouterHeaders(config),
         ...openRouterHeaders(config)
       },
       body: JSON.stringify({
@@ -402,6 +413,7 @@ async function requestResponsesCompletion<T>({
         "content-type": "application/json",
         "openai-beta": "responses=v1",
         authorization: `Bearer ${apiKey}`,
+        ...agentRouterHeaders(config),
         ...openRouterHeaders(config)
       },
       body: JSON.stringify({
